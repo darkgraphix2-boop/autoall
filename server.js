@@ -50,16 +50,27 @@ const passwordFields = ['input[type="password"]', 'input[autocomplete="current-p
 const otpFields = ['input[autocomplete="one-time-code"]', 'input[name*="otp" i]', 'input[name*="code" i]', 'input[inputmode="numeric"]'];
 async function stage(page) {
   if (await pick(page, otpFields, 100)) return 'otp';
+  if (await page.getByRole('heading', { name: /Registrarse/i }).isVisible().catch(() => false)) return 'register';
+  if (new URL(page.url()).pathname.startsWith('/welcome')) return 'welcome';
   if (await pick(page, passwordFields, 100)) return 'password';
   if (new URL(page.url()).hostname === 'www.zalando.es' &&
       await page.getByText(/Nuestros partners tienen algo para ti/i).isVisible().catch(() => false)) return 'ready';
   return 'waiting';
 }
-async function afterSubmit(page) {
-  await page.waitForTimeout(2000);
-  const next = await stage(page);
-  if (next === 'waiting') return { stage: 'waiting', message: 'Page is waiting for another step or a manual verification. Automated browser cannot solve CAPTCHA.' };
-  return { stage: next };
+async function afterSubmit(page, previousStage = 'email') {
+  let last = 'waiting';
+  for (let attempt = 0; attempt < 20; attempt++) {
+    await page.waitForTimeout(500);
+    const next = await stage(page);
+    last = next;
+    if (next !== 'waiting' && next !== previousStage) {
+      if (next === 'register') return { stage: next, message: 'This email needs account registration. Complete it on Zalando, then restart here.' };
+      if (next === 'welcome') return { stage: next, message: 'Complete Zalando Plus welcome and terms on Zalando, then restart here.' };
+      return { stage: next };
+    }
+  }
+  if (last === previousStage) return { stage: last, message: 'Zalando is still on this step. Check any field error or retry.' };
+  return { stage: 'waiting', message: 'Zalando is waiting for another step or manual verification. CAPTCHA cannot be solved here.' };
 }
 function requireSession(req, res, next) {
   if (!session) return res.status(409).json({ error: 'Session expired. Start again.' });
@@ -102,7 +113,7 @@ app.post('/api/password', requireSession, async (req, res) => {
     const submit = await pick(session.page, ['button[type="submit"]', 'input[type="submit"]']);
     if (submit) await submit.click();
     else await field.press('Enter');
-    res.json(await afterSubmit(session.page));
+    res.json(await afterSubmit(session.page, 'password'));
   } catch {
     res.status(502).json({ error: 'Password step failed. Check the account or restart.' });
   }
@@ -117,7 +128,7 @@ app.post('/api/otp', requireSession, async (req, res) => {
     const submit = await pick(session.page, ['button[type="submit"]', 'input[type="submit"]']);
     if (submit) await submit.click();
     else await field.press('Enter');
-    res.json(await afterSubmit(session.page));
+    res.json(await afterSubmit(session.page, 'otp'));
   } catch {
     res.status(502).json({ error: 'Code step failed. Check the code or restart.' });
   }
@@ -127,12 +138,14 @@ app.post('/api/links', requireSession, async (_req, res) => {
     const page = session.page;
     const results = [];
     for (const name of ['Duolingo', 'Spotify']) {
-      await page.goto('https://www.zalando.es/plus?k=v', { waitUntil: 'domcontentloaded', timeout: 45000 });
+      await page.goto('https://www.zalando.es/plus?k=v', { waitUntil: 'commit', timeout: 30000 });
       if (new URL(page.url()).hostname !== 'www.zalando.es') return res.status(409).json({ error: 'Login has not completed.' });
       const card = page.locator('article,section,div').filter({ hasText: new RegExp(name, 'i') })
         .filter({ has: page.getByText(/Disfruta de esta ventaja/i) }).last();
       const button = card.getByText(/Disfruta de esta ventaja/i).first();
-      if (!await button.isVisible().catch(() => false)) { results.push({ name, error: 'Benefit card not found' }); continue; }
+      if (!await button.waitFor({ state: 'visible', timeout: 10000 }).then(() => true).catch(() => false)) {
+        results.push({ name, error: 'Benefit card not found' }); continue;
+      }
       await button.click();
       const activation = page.getByRole('link', { name: /Activ(a|ar) (tu|la) prueba gratuita/i }).first();
       await activation.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
