@@ -70,12 +70,15 @@ app.post('/api/start', async (req, res) => {
   const email = String(req.body.email || '').trim();
   if (!/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ error: 'Enter a valid email.' });
   await dispose();
+  let phase = 'launch';
   try {
     const browser = await chromium.launch({ headless: true });
     const context = await browser.newContext({ locale: 'es-ES' });
     const page = await context.newPage();
     session = { browser, page, lastUsed: Date.now() };
-    await page.goto('https://www.zalando.es/plus?k=v', { waitUntil: 'domcontentloaded', timeout: 45000 });
+    phase = 'navigate';
+    await page.goto('https://www.zalando.es/plus?k=v', { waitUntil: 'commit', timeout: 30000 });
+    phase = 'email-field';
     const field = await pick(page, emailFields);
     if (!field) return res.json({ stage: await stage(page), message: 'Email input was not found. Login page may have changed or blocked the browser.' });
     await field.fill(email);
@@ -83,9 +86,10 @@ app.post('/api/start', async (req, res) => {
     if (submit) await submit.click();
     else await field.press('Enter');
     res.json(await afterSubmit(page));
-  } catch {
+  } catch (error) {
+    console.error('Start failed', phase, error?.name || 'Error', String(error?.message || '').split('\n')[0].slice(0, 160));
     await dispose();
-    res.status(502).json({ error: 'Zalando login page could not be opened. Hosted browsers may be blocked.' });
+    res.status(502).json({ error: phase === 'navigate' ? 'Zalando page did not respond to Railway browser.' : 'Hosted browser could not start or complete the login page.' });
   }
 });
 app.post('/api/password', requireSession, async (req, res) => {
@@ -144,3 +148,18 @@ app.post('/api/end', async (_req, res) => { await dispose(); res.json({ done: tr
 app.get('/', (_req, res) => res.sendFile('index.html', { root: process.cwd() }));
 app.get('/app.js', (_req, res) => res.sendFile('app.js', { root: process.cwd() }));
 app.listen(port, '0.0.0.0', () => console.log('Server listening'));
+
+// Check the public login navigation once at startup without submitting account data.
+(async () => {
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+    const page = await browser.newPage();
+    await page.goto('https://www.zalando.es/plus?k=v', { waitUntil: 'commit', timeout: 20000 });
+    console.log('Zalando navigation probe:', new URL(page.url()).hostname);
+  } catch (error) {
+    console.error('Zalando navigation probe failed:', error?.name || 'Error', String(error?.message || '').split('\n')[0].slice(0, 160));
+  } finally {
+    if (browser) await browser.close().catch(() => {});
+  }
+})();
