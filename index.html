@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Plus benefit links</title>
+  <style>
+    body{font:16px system-ui,sans-serif;background:#f5f6fa;color:#121826;max-width:480px;margin:40px auto;padding:16px}
+    main{background:#fff;border:1px solid #dce1e8;border-radius:18px;padding:24px;box-shadow:0 10px 28px #17223b13}
+    h1{font-size:24px;margin:0 0 10px}p{line-height:1.5;color:#555f70}
+    label{display:block;font-weight:650;margin:18px 0 6px}
+    input{box-sizing:border-box;width:100%;padding:12px;border:1px solid #b8c0cc;border-radius:9px;font:inherit}
+    button{padding:12px 16px;border:0;border-radius:9px;background:#1747d1;color:white;font:inherit;font-weight:700;cursor:pointer;margin-top:14px}
+    button:disabled{opacity:.55}section[hidden]{display:none}#output{overflow-wrap:anywhere}
+    .link{border:1px solid #dce1e8;border-radius:8px;padding:12px;margin:10px 0}
+    a{color:#1747d1}small{color:#667085}
+  </style>
+</head>
+<body><main>
+  <h1>Zalando Plus links</h1>
+  <p>Apne account ki email se login start karo. Password aur OTP sirf is session ke liye Zalando login page par submit honge; server inhein save nahi karta.</p>
+  <section id="keyStep"><label for="key">Private access key</label><input id="key" type="password" autocomplete="off"><button id="unlock">Continue</button></section>
+  <section id="emailStep" hidden><label for="email">Account email</label><input id="email" type="email" autocomplete="username"><button id="start">Continue</button></section>
+  <section id="passwordStep" hidden><label for="password">Password</label><input id="password" type="password" autocomplete="current-password"><button id="sendPassword">Continue</button></section>
+  <section id="otpStep" hidden><label for="otp">Verification code</label><input id="otp" autocomplete="one-time-code"><button id="sendOtp">Continue</button></section>
+  <section id="readyStep" hidden><button id="find">Get Duolingo & Spotify links</button></section>
+  <section id="waitStep" hidden><button id="check">Try links</button></section>
+  <p id="status" role="status"></p><div id="output"></div>
+  <button id="end" hidden>End session</button>
+  <p><small>Only use your own account. Offers may vary. CAPTCHA or extra verification may require normal login on Zalando.</small></p>
+</main><script src="/app.js"></script></body></html>
