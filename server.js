@@ -91,7 +91,12 @@ app.post('/api/start', async (req, res) => {
     await page.goto('https://www.zalando.es/plus?k=v', { waitUntil: 'commit', timeout: 30000 });
     phase = 'email-field';
     const field = await pick(page, emailFields);
-    if (!field) return res.json({ stage: await stage(page), message: 'Email input was not found. Login page may have changed or blocked the browser.' });
+    if (!field) {
+      console.warn('Email field missing', new URL(page.url()).hostname, new URL(page.url()).pathname,
+        'title:', (await page.title()).slice(0, 80), 'inputs:', await page.locator('input').count(),
+        'headings:', (await page.locator('h1,h2').allTextContents()).map(x => x.trim().slice(0, 60)).slice(0, 5));
+      return res.json({ stage: 'waiting', message: 'Zalando login form did not appear in the hosted browser. Account was not created.' });
+    }
     await field.fill(email);
     const submit = await pick(page, ['button[type="submit"]', 'input[type="submit"]']);
     if (submit) await submit.click();
@@ -169,7 +174,10 @@ app.listen(port, '0.0.0.0', () => console.log('Server listening'));
     browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
     await page.goto('https://www.zalando.es/plus?k=v', { waitUntil: 'commit', timeout: 20000 });
-    console.log('Zalando navigation probe:', new URL(page.url()).hostname);
+    await page.waitForTimeout(5000);
+    console.log('Zalando navigation probe:', new URL(page.url()).hostname, new URL(page.url()).pathname,
+      'title:', (await page.title()).slice(0, 80), 'inputs:', await page.locator('input').count(),
+      'headings:', (await page.locator('h1,h2').allTextContents()).map(x => x.trim().slice(0, 60)).slice(0, 5));
   } catch (error) {
     console.error('Zalando navigation probe failed:', error?.name || 'Error', String(error?.message || '').split('\n')[0].slice(0, 160));
   } finally {
