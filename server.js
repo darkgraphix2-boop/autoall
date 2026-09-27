@@ -92,9 +92,14 @@ app.post('/api/start', async (req, res) => {
     phase = 'email-field';
     const field = await pick(page, emailFields);
     if (!field) {
+      const unavailable = await page.getByText(/No se puede acceder a la web en este momento/i).isVisible().catch(() => false);
       console.warn('Email field missing', new URL(page.url()).hostname, new URL(page.url()).pathname,
         'title:', (await page.title()).slice(0, 80), 'inputs:', await page.locator('input').count(),
         'headings:', (await page.locator('h1,h2').allTextContents()).map(x => x.trim().slice(0, 60)).slice(0, 5));
+      if (unavailable) {
+        await dispose();
+        return res.status(503).json({ error: 'Zalando says the page is unavailable to this Railway browser. No account was created.' });
+      }
       return res.json({ stage: 'waiting', message: 'Zalando login form did not appear in the hosted browser. Account was not created.' });
     }
     await field.fill(email);
@@ -138,6 +143,9 @@ app.post('/api/otp', requireSession, async (req, res) => {
     res.status(502).json({ error: 'Code step failed. Check the code or restart.' });
   }
 });
+app.post('/api/status', requireSession, async (_req, res) => {
+  res.json(await afterSubmit(session.page));
+});
 app.post('/api/links', requireSession, async (_req, res) => {
   try {
     const page = session.page;
@@ -157,6 +165,7 @@ app.post('/api/links', requireSession, async (_req, res) => {
       const href = await activation.getAttribute('href').catch(() => null);
       results.push(href ? { name, url: new URL(href, page.url()).href } : { name, error: 'Activation link not found' });
     }
+    if (results.every(item => !item.url)) return res.status(409).json({ error: 'No benefit links found. Account login or Zalando Plus setup has not completed.' });
     res.json({ links: results });
   } catch {
     res.status(502).json({ error: 'Could not read the two benefit links. Page layout may have changed.' });
