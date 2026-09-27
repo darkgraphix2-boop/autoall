@@ -19,7 +19,7 @@ const equal = (a, b) => {
   const x = Buffer.from(a), y = Buffer.from(b);
   return x.length === y.length && crypto.timingSafeEqual(x, y);
 };
-app.use((req, res, next) => {
+app.use('/api', (req, res, next) => {
   const token = req.headers.authorization?.match(/^Bearer (.+)$/)?.[1] || '';
   if (!equal(token, accessKey)) return res.status(401).json({ error: 'Invalid access key' });
   next();
