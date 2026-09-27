@@ -1,6 +1,6 @@
 let key = '';
 const $ = id => document.getElementById(id);
-const steps = ['keyStep','emailStep','passwordStep','otpStep','readyStep','waitStep'];
+const steps = ['keyStep','emailStep','passwordStep','registerStep','otpStep','welcomeStep','readyStep','waitStep'];
 const show = id => { steps.forEach(step => $(step).hidden = step !== id); };
 const status = text => { $('status').textContent = text; };
 async function call(path, data = {}) {
@@ -17,7 +17,7 @@ async function run(action) {
   try { await action(); } catch (error) { status(error.message); }
 }
 function next(result) {
-  show(({password:'passwordStep',otp:'otpStep',ready:'readyStep',waiting:'waitStep'})[result.stage] || 'emailStep');
+  show(({password:'passwordStep',register:'registerStep',otp:'otpStep',welcome:'welcomeStep',ready:'readyStep',waiting:'waitStep'})[result.stage] || 'emailStep');
   status(result.message || (result.stage === 'ready' ? 'Logged in. Get the two links.' : 'Continue.'));
   $('end').hidden = false;
 }
@@ -35,6 +35,9 @@ $('sendOtp').onclick = () => run(async () => {
   const code = $('otp').value; $('otp').value = '';
   next(await call('otp', { code }));
 });
+for (const id of ['restartRegister','restartWelcome']) $(id).onclick = () => {
+  show('emailStep'); status('After completing the official Zalando steps, enter your email again.');
+};
 async function links() {
   const result = await call('links');
   $('output').replaceChildren();
