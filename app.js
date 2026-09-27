@@ -54,5 +54,5 @@ async function links() {
   status('Links ready.');
 }
 $('find').onclick = () => run(links);
-$('check').onclick = () => run(links);
+$('check').onclick = () => run(async () => next(await call('status')));
 $('end').onclick = () => run(async () => { await call('end'); key = ''; $('output').replaceChildren(); $('end').hidden = true; show('keyStep'); status('Session ended.'); });
